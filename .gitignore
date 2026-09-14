@@ -1,0 +1,9 @@
+venv/
+.env
+data/
+*.faiss
+vectorstore/
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
