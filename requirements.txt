@@ -1,10 +1,8 @@
 langchain
 langchain-community
-langchain-openai
 langchain-google-genai
 faiss-cpu
 streamlit
-openai
 google-generativeai
 pypdf
 python-docx
