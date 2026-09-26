@@ -7,8 +7,8 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # --- Models ---
-GEMINI_CHAT_MODEL = "gemini-1.5-flash"   
-GEMINI_PRO_MODEL = "gemini-1.5-pro"      
+GEMINI_CHAT_MODEL = "gemini-3.5-flash-lite"   
+GEMINI_PRO_MODEL = "gemini-3.5-flash"      
 GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"  
 
 # --- Paths ---
