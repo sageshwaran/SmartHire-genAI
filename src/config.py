@@ -9,8 +9,8 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 # --- Models ---
 GEMINI_CHAT_MODEL = "gemini-3.5-flash-lite"   
 GEMINI_PRO_MODEL = "gemini-3.5-flash"      
-GEMINI_EMBEDDING_MODEL = "models/text-embedding-004"  
-
+GEMINI_EMBEDDING_MODEL = "gemini-embedding-001"
+EMBEDDING_DIMENSIONS = 768
 # --- Paths ---
 DATA_DIR = "data"
 RESUMES_DIR = f"{DATA_DIR}/resumes"
