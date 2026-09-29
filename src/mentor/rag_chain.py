@@ -6,7 +6,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGener
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-
+from src.safety.guardrails import check_input
 from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL, CAREER_NOTES_DIR, VECTORSTORE_DIR
 from src.search.job_search import search_jobs
 
@@ -81,9 +81,13 @@ _chain = _prompt | _llm | StrOutputParser()
 
 def ask_mentor(question: str) -> str:
     """
-    Answer a career question using RAG: retrieve relevant career notes + relevant
-    job postings, then generate a grounded answer via a LangChain LCEL pipeline.
+    Answer a career question using RAG, after passing the question through
+    the guardrails layer.
     """
+    guard_result = check_input(question)
+    if not guard_result.is_allowed:
+        return guard_result.message
+
     notes_store = load_career_notes_index()
     note_docs = notes_store.similarity_search(question, k=3)
     notes_context = "\n\n".join(
