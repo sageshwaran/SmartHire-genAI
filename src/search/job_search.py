@@ -6,6 +6,10 @@ import pandas as pd
 
 from src.config import VECTORSTORE_DIR
 from src.search.embed import embed_texts, embed_single_text
+from src.parsing.resume_parser import ResumeProfile
+from src.search.profile_query import profile_to_search_text
+
+
 
 INDEX_PATH = Path(VECTORSTORE_DIR) / "jobs.index"
 METADATA_PATH = Path(VECTORSTORE_DIR) / "jobs_metadata.pkl"
@@ -118,3 +122,11 @@ def search_jobs(query_text: str, top_n: int = 5):
         })
 
     return results
+
+def match_jobs_for_profile(profile: ResumeProfile, top_n: int = 5):
+    """
+    Given a parsed resume profile, find the top_n most semantically similar jobs.
+    This is the full pipeline entry point: profile -> query text -> embedding -> FAISS search.
+    """
+    query_text = profile_to_search_text(profile)
+    return search_jobs(query_text, top_n=top_n)
