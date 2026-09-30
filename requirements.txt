@@ -3,7 +3,7 @@ langchain-community
 langchain-google-genai
 faiss-cpu
 streamlit
-google-generativeai
+google-genai
 pypdf
 python-docx
 python-dotenv

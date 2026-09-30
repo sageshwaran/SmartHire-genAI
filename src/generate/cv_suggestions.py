@@ -1,16 +1,15 @@
 import json
 from typing import List
 from pydantic import BaseModel, Field
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL
-from src.parsing.resume_parser import ResumeProfile, build_gemini_schema
+from src.parsing.resume_parser import ResumeProfile
 from src.generate.prompts import cv_improvement_prompt_v2
 
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
-
-# --- Schema definition ---
 
 class WeakBulletPoint(BaseModel):
     original_line: str = Field(description="The resume line that is weak or vague")
@@ -30,11 +29,6 @@ class CVSuggestions(BaseModel):
         description="A 2-3 sentence professional summary tailored to the target role"
     )
 
-
-_GEMINI_SCHEMA = build_gemini_schema(CVSuggestions)
-
-
-# --- Helper: turn a ResumeProfile into a compact text block for the prompt ---
 
 def _resume_to_summary_text(profile: ResumeProfile) -> str:
     lines = [f"Name: {profile.name}"]
@@ -56,23 +50,16 @@ def _resume_to_summary_text(profile: ResumeProfile) -> str:
     return "\n".join(lines)
 
 
-# --- Main function ---
-
 def generate_cv_suggestions(profile: ResumeProfile, target_job_description: str) -> CVSuggestions:
-    """
-    Given a parsed resume profile and a target job description, generate
-    specific improvement suggestions using Gemini structured output.
-    """
     resume_summary = _resume_to_summary_text(profile)
     prompt = cv_improvement_prompt_v2(resume_summary, target_job_description)
 
-    model = genai.GenerativeModel(model_name=GEMINI_CHAT_MODEL)
-
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
+    response = client.models.generate_content(
+        model=GEMINI_CHAT_MODEL,
+        contents=prompt,
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
-            response_schema=_GEMINI_SCHEMA,
+            response_schema=CVSuggestions,
         ),
     )
 

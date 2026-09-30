@@ -1,16 +1,16 @@
 import re
+import json
 from enum import Enum
 from pydantic import BaseModel, Field
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL
-from src.parsing.resume_parser import build_gemini_schema  # reusing our schema cleaner
 
-genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.Client(api_key=GOOGLE_API_KEY)
 
 MAX_INPUT_LENGTH = 1000
 
-# Patterns commonly used to try to override a system prompt
 _INJECTION_PATTERNS = [
     r"ignore (all )?(previous|above|prior) instructions",
     r"disregard (all )?(previous|above|prior) instructions",
@@ -18,7 +18,7 @@ _INJECTION_PATTERNS = [
     r"forget (all )?(previous|your) instructions",
     r"system prompt",
     r"new instructions:",
-    r"act as (a |an )?(?!career|mentor)",  # "act as X" where X isn't career/mentor-related
+    r"act as (a |an )?(?!career|mentor)",
 ]
 
 
@@ -32,13 +32,10 @@ class RejectionReason(str, Enum):
 class GuardrailResult(BaseModel):
     is_allowed: bool
     reason: RejectionReason | None = None
-    message: str = Field(
-        default="",
-        description="A friendly, user-facing explanation if rejected"
-    )
+    message: str = Field(default="", description="A friendly, user-facing explanation if rejected")
+
 
 def _rule_based_check(text: str) -> GuardrailResult | None:
-    """Fast, free checks. Returns None if the input passes (needs further checking)."""
     stripped = text.strip()
 
     if not stripped:
@@ -64,18 +61,14 @@ def _rule_based_check(text: str) -> GuardrailResult | None:
                 message="I can't process that request. Please ask a career-related question.",
             )
 
-    return None  # passed rule-based checks
+    return None
 
-
-# --- LLM-based topic classifier ---
 
 class TopicClassification(BaseModel):
     is_career_related: bool = Field(
         description="True if the question is about careers, jobs, skills, interviews, or resumes"
     )
 
-
-_CLASSIFIER_SCHEMA = build_gemini_schema(TopicClassification)
 
 _CLASSIFIER_PROMPT = """Classify whether the following user question is related to careers, \
 job searching, skill development, resumes, or interview preparation.
@@ -86,16 +79,15 @@ Respond with the classification only."""
 
 
 def _llm_topic_check(text: str) -> GuardrailResult:
-    model = genai.GenerativeModel(model_name=GEMINI_CHAT_MODEL)
-    response = model.generate_content(
-        _CLASSIFIER_PROMPT.format(question=text),
-        generation_config=genai.GenerationConfig(
+    response = client.models.generate_content(
+        model=GEMINI_CHAT_MODEL,
+        contents=_CLASSIFIER_PROMPT.format(question=text),
+        config=types.GenerateContentConfig(
             response_mime_type="application/json",
-            response_schema=_CLASSIFIER_SCHEMA,
+            response_schema=TopicClassification,
         ),
     )
 
-    import json
     data = json.loads(response.text)
     classification = TopicClassification.model_validate(data)
 
@@ -111,10 +103,6 @@ def _llm_topic_check(text: str) -> GuardrailResult:
 
 
 def check_input(text: str) -> GuardrailResult:
-    """
-    Run the full guardrails pipeline on a user input: rule-based checks first
-    (fast, free), then an LLM-based topic classifier if those pass.
-    """
     rule_result = _rule_based_check(text)
     if rule_result is not None:
         return rule_result
