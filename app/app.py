@@ -340,10 +340,15 @@ elif page == "CV review":
             if not target_job_text.strip():
                 st.markdown('<div class="status-line">Provide a job description first.</div>', unsafe_allow_html=True)
             else:
-                with st.spinner("Reviewing"):
-                    suggestions = generate_cv_suggestions(st.session_state.profile, target_job_text)
+                try:
+                    with st.spinner("Reviewing"):
+                        suggestions = generate_cv_suggestions(st.session_state.profile, target_job_text)
+                except ValueError as e:
+                    st.markdown(f'<div class="status-line">{e}</div>', unsafe_allow_html=True)
+                    suggestions = None
 
-                st.divider()
+                if suggestions:
+                    st.divider()
 
                 if suggestions.missing_skills:
                     st.markdown('<div class="field-label">Missing skills</div>', unsafe_allow_html=True)

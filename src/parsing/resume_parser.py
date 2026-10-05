@@ -3,7 +3,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
-
+from src.safety.guardrails import _rule_based_check,MAX_DOCUMENT_LENGTH
 from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL
 
 client = genai.Client(api_key=GOOGLE_API_KEY)
@@ -53,8 +53,13 @@ Rules:
 def parse_resume(resume_text: str) -> ResumeProfile:
     """
     Send resume text to Gemini and return a validated ResumeProfile object.
-    Uses the new google-genai SDK's native Pydantic schema support.
+    Runs the resume text through guardrails first, since an uploaded document
+    is untrusted input that could contain an injection attempt.
     """
+    guard_result = _rule_based_check(resume_text, max_length=MAX_DOCUMENT_LENGTH)
+    if guard_result is not None:
+        raise ValueError(f"Resume rejected by guardrails: {guard_result.message}")
+
     response = client.models.generate_content(
         model=GEMINI_CHAT_MODEL,
         contents=f"Resume text:\n\n{resume_text}",

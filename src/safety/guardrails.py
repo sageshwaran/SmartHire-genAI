@@ -9,7 +9,8 @@ from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL
 
 client = genai.Client(api_key=GOOGLE_API_KEY)
 
-MAX_INPUT_LENGTH = 1000
+MAX_INPUT_LENGTH = 1000           # for mentor chat questions
+MAX_DOCUMENT_LENGTH = 8000        # for resumes / job descriptions
 
 _INJECTION_PATTERNS = [
     r"ignore (all )?(previous|above|prior) instructions",
@@ -35,7 +36,7 @@ class GuardrailResult(BaseModel):
     message: str = Field(default="", description="A friendly, user-facing explanation if rejected")
 
 
-def _rule_based_check(text: str) -> GuardrailResult | None:
+def _rule_based_check(text: str, max_length: int = MAX_INPUT_LENGTH) -> GuardrailResult | None:
     stripped = text.strip()
 
     if not stripped:
@@ -45,11 +46,11 @@ def _rule_based_check(text: str) -> GuardrailResult | None:
             message="Please enter a question.",
         )
 
-    if len(stripped) > MAX_INPUT_LENGTH:
+    if len(stripped) > max_length:
         return GuardrailResult(
             is_allowed=False,
             reason=RejectionReason.TOO_LONG,
-            message=f"Please keep your question under {MAX_INPUT_LENGTH} characters.",
+            message=f"Input exceeds the {max_length} character limit.",
         )
 
     lowered = stripped.lower()
@@ -58,11 +59,10 @@ def _rule_based_check(text: str) -> GuardrailResult | None:
             return GuardrailResult(
                 is_allowed=False,
                 reason=RejectionReason.INJECTION_ATTEMPT,
-                message="I can't process that request. Please ask a career-related question.",
+                message="Input rejected: contains a disallowed instruction pattern.",
             )
 
     return None
-
 
 class TopicClassification(BaseModel):
     is_career_related: bool = Field(

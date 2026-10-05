@@ -3,7 +3,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from google import genai
 from google.genai import types
-
+from src.safety.guardrails import _rule_based_check, MAX_DOCUMENT_LENGTH
 from src.config import GOOGLE_API_KEY, GEMINI_CHAT_MODEL
 from src.parsing.resume_parser import ResumeProfile
 from src.generate.prompts import cv_improvement_prompt_v2
@@ -51,6 +51,11 @@ def _resume_to_summary_text(profile: ResumeProfile) -> str:
 
 
 def generate_cv_suggestions(profile: ResumeProfile, target_job_description: str) -> CVSuggestions:
+    guard_result = _rule_based_check(target_job_description, max_length=MAX_DOCUMENT_LENGTH)
+    if guard_result is not None:
+        raise ValueError(f"Job description rejected by guardrails: {guard_result.message}")
+
+    resume_summary = _resume_to_summary_text(profile)
     resume_summary = _resume_to_summary_text(profile)
     prompt = cv_improvement_prompt_v2(resume_summary, target_job_description)
 
