@@ -1,0 +1,9 @@
+[theme]
+base = "dark"
+primaryColor = "#4f7cff"
+backgroundColor = "#0e1013"
+secondaryBackgroundColor = "#15181d"
+textColor = "#e4e6eb"
+
+[server]
+folderWatchBlacklist = ["venv", ".git", "__pycache__"]

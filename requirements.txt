@@ -7,6 +7,5 @@ google-genai
 pypdf
 python-docx
 python-dotenv
-sentence-transformers
 pandas
 langchain-text-splitters

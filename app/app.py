@@ -240,10 +240,14 @@ if page == "Resume":
     st.markdown("# Resume")
     st.markdown('<div class="app-subtitle">Upload a document to extract a structured profile.</div>', unsafe_allow_html=True)
 
+    MAX_UPLOAD_SIZE_MB = 5
+
     uploaded_file = st.file_uploader("Document", type=["pdf", "docx"], label_visibility="collapsed")
 
     if uploaded_file is not None:
-        if st.button("Upload"):
+        if uploaded_file.size > MAX_UPLOAD_SIZE_MB * 1024 * 1024:
+            st.markdown(f'<div class="status-line">File exceeds the {MAX_UPLOAD_SIZE_MB}MB limit.</div>', unsafe_allow_html=True)
+        elif st.button("Upload"):
             with st.spinner("Parsing"):
                 suffix = Path(uploaded_file.name).suffix
                 with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
