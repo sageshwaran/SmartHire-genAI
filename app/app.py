@@ -225,6 +225,20 @@ st.markdown("""
         border: 1px solid var(--border);
         border-bottom-left-radius: 2px;
     }
+    /* Hide Streamlit GitHub/source icon */
+        [data-testid="stToolbar"] {
+            display: none !important;
+        }
+
+        /* Hide the top-right menu if needed */
+        #MainMenu {
+            visibility: hidden;
+        }
+
+        /* Hide Streamlit footer */
+        footer {
+            visibility: hidden;
+        }
 </style>
 """, unsafe_allow_html=True)
 
