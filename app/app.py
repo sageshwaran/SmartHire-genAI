@@ -12,6 +12,14 @@ from src.search.job_search import match_jobs_for_profile
 from src.generate.cv_suggestions import generate_cv_suggestions
 from src.mentor.rag_chain import ask_mentor
 
+def friendly_error(e: Exception) -> str:
+    """Translate common API failures into calm, non-technical messages for the UI."""
+    msg = str(e)
+    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+        return "This feature has reached its usage limit for today. Please try again later."
+    if "rejected by guardrails" in msg:
+        return msg.split("guardrails: ", 1)[-1] if "guardrails: " in msg else msg
+    return "Something went wrong processing your request. Please try again."
 
 st.set_page_config(page_title="SmartHire", layout="wide", initial_sidebar_state="expanded")
 
@@ -191,6 +199,32 @@ st.markdown("""
     [data-testid="stSidebar"] .stButton button[kind="primary"]:hover {
         background: var(--accent-dim);
     }
+        .chat-row {
+        display: flex;
+        margin-bottom: 10px;
+    }
+    .chat-row.user { justify-content: flex-end; }
+    .chat-row.assistant { justify-content: flex-start; }
+
+    .chat-bubble {
+        max-width: 70%;
+        padding: 10px 14px;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+    .chat-bubble.user {
+        background: var(--accent-dim);
+        color: var(--text-primary);
+        border: 1px solid var(--accent);
+        border-bottom-right-radius: 2px;
+    }
+    .chat-bubble.assistant {
+        background: var(--surface-raised);
+        color: var(--text-primary);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: 2px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -258,7 +292,7 @@ if page == "Resume":
                     st.session_state.profile = parse_resume(resume_text)
                     st.session_state.matched_jobs = None
                 except Exception as e:
-                    st.markdown(f'<div class="status-line">Parsing failed: {e}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
                 finally:
                     Path(tmp_path).unlink(missing_ok=True)
 
@@ -309,8 +343,11 @@ elif page == "Matched roles":
             run = st.button("Search")
 
         if run:
-            with st.spinner("Searching"):
-                st.session_state.matched_jobs = match_jobs_for_profile(st.session_state.profile, top_n=top_n)
+            try:
+                with st.spinner("Searching"):
+                    st.session_state.matched_jobs = match_jobs_for_profile(st.session_state.profile, top_n=top_n)
+            except Exception as e:
+                st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
 
         if st.session_state.matched_jobs:
             st.divider()
@@ -344,13 +381,12 @@ elif page == "CV review":
             if not target_job_text.strip():
                 st.markdown('<div class="status-line">Provide a job description first.</div>', unsafe_allow_html=True)
             else:
+                suggestions = None
                 try:
                     with st.spinner("Reviewing"):
                         suggestions = generate_cv_suggestions(st.session_state.profile, target_job_text)
-                except ValueError as e:
-                    st.markdown(f'<div class="status-line">{e}</div>', unsafe_allow_html=True)
-                    suggestions = None
-
+                except Exception as e:
+                    st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
                 if suggestions:
                     st.divider()
 
@@ -379,17 +415,22 @@ elif page == "Career mentor":
     st.markdown('<div class="app-subtitle">Unsupported or off-topic questions are declined.</div>', unsafe_allow_html=True)
 
     for role, message in st.session_state.chat_history:
-        with st.chat_message(role):
-            st.write(message)
+        st.markdown(f"""
+        <div class="chat-row {role}">
+            <div class="chat-bubble {role}">{message}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
     user_question = st.chat_input("Ask a question")
 
     if user_question:
         st.session_state.chat_history.append(("user", user_question))
-        with st.chat_message("user"):
-            st.write(user_question)
-        with st.chat_message("assistant"):
-            with st.spinner(""):
+
+        with st.spinner("Thinking"):
+            try:
                 answer = ask_mentor(user_question)
-                st.write(answer)
+            except Exception as e:
+                answer = friendly_error(e)
+
         st.session_state.chat_history.append(("assistant", answer))
+        st.rerun()
