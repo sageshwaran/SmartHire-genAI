@@ -4,7 +4,7 @@
 
 **Methodology**: 5 test queries covering different target roles (Python/ML,
 Data Analyst, Backend Engineer, Data Scientist/CV, Business Analyst), top-5
-results each, manually judged relevant/not relevant against a 950-job sample
+results each, manually judged relevant/not relevant against a 1500-job sample
 of the Naukri Data Science Jobs (India) dataset.
 
 | Query | Relevant / 5 | Notes |
@@ -61,7 +61,7 @@ bug. Documented here as a known limitation rather than a claimed fix.
 
 ## 5. Limitations
 
-- Job corpus limited to 950 sampled rows from the Naukri Data Science Jobs
+- Job corpus limited to 1500 sampled rows from the Naukri Data Science Jobs
   (India) dataset — biased toward data science/analyst roles, and India-only.
 - Resume `experience` extraction returns empty for project-based resumes
   (student profiles with projects rather than formal jobs) — search relies
