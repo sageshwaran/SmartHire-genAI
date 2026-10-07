@@ -1,10 +1,12 @@
 # SmartHire GenAI
 
-An end-to-end Generative AI career portal. Upload a resume and get a structured
-candidate profile, semantically matched jobs from a real job dataset, AI-generated
-CV improvement suggestions for a target role, and an AI Career Mentor that answers
-career questions using retrieval-augmented generation (RAG) — grounded strictly in
-a defined knowledge base, not open-ended generation.
+A deployed, end-to-end Generative AI career portal. Upload a resume and get a
+structured candidate profile, semantically matched jobs from a real job dataset,
+AI-generated CV improvement suggestions for a target role, and an AI Career
+Mentor that answers career questions using retrieval-augmented generation (RAG)
+— grounded strictly in a defined knowledge base, not open-ended generation.
+
+**Live app:** [resume-matching-and-career-mentor.streamlit.app](https://resume-matching-and-career-mentor.streamlit.app)
 
 Built as a Generative AI capstone project, covering prompt engineering, structured
 LLM output, embeddings, vector search, RAG, LangChain orchestration, guardrails,
@@ -23,8 +25,11 @@ evaluation, and deployment.
   questions using a curated set of career notes and live job-market data. Refuses
   to answer when the information isn't in its knowledge base.
 - **Guardrails** — a two-layer validation system (rule-based pattern checks + an
-  LLM-based topic classifier) that rejects empty, oversized, off-topic, or
-  prompt-injection input before it reaches the main LLM calls.
+  LLM-based topic classifier) applied before every LLM call across all three
+  entry points (resume parsing, CV suggestions, and mentor chat) — rejecting
+  empty, oversized, off-topic, or prompt-injection input.
+- **Graceful degradation** — API quota limits and failures surface as plain,
+  user-facing messages rather than raw tracebacks.
 
 ## Tech Stack
 
@@ -33,80 +38,90 @@ evaluation, and deployment.
 - **Orchestration**: LangChain (LCEL pipelines, RAG retrieval)
 - **Vector Search**: FAISS (`faiss-cpu`)
 - **Structured Output**: Pydantic schemas, enforced via Gemini's native schema support
-- **UI**: Streamlit
+- **UI**: Streamlit, custom dark theme, deployed on Streamlit Community Cloud
 - **Document Parsing**: pypdf, python-docx
 
 ## Project Structure
+
+```
 smarthire-genai/
+├── .streamlit/
+│   └── config.toml        # Theme and file watcher settings
 ├── data/
-│ ├── jobs/ # Job postings dataset (CSV, not committed)
-│ ├── resumes/ # Sample resumes for testing
-│ └── career_notes/ # Career guidance documents the mentor retrieves from
-├── vectorstore/ # Saved FAISS indexes (not committed)
+│   ├── jobs/               # Job postings dataset (CSV, not committed)
+│   ├── resumes/              # Sample resumes for testing
+│   └── career_notes/           # Career guidance documents the mentor retrieves from
+├── vectorstore/                  # Prebuilt FAISS indexes (committed for deployment)
 ├── src/
-│ ├── config.py
-│ ├── parsing/ # Resume loading + structured parsing
-│ ├── search/ # Embeddings + FAISS job search
-│ ├── generate/ # Prompt library + CV suggestion generator
-│ ├── mentor/ # RAG career mentor (LangChain)
-│ ├── safety/ # Guardrails layer
-│ └── evaluate.py # Evaluation script
+│   ├── config.py                  # Settings; reads secrets from .env locally or
+│   │                                 Streamlit secrets when deployed
+│   ├── parsing/                     # Resume loading + structured parsing
+│   ├── search/                        # Embeddings + FAISS job search
+│   ├── generate/                        # Prompt library + CV suggestion generator
+│   ├── mentor/                            # RAG career mentor (LangChain)
+│   ├── safety/                              # Guardrails layer
+│   └── evaluate.py                            # Evaluation script
 ├── app/
-│ └── streamlit_app.py # Streamlit portal
+│   └── streamlit_app.py                         # Streamlit portal
+├── runtime.txt                                    # Pinned Python version for deployment
 └── reports/
-└── answer_quality.md # Evaluation report
-
-
-## Setup
-
-1. Clone the repository
-```bash
-   git clone https://github.com/sageshwaran/smarthire-genai.git
-   cd smarthire-genai
+    └── answer_quality.md                            # Evaluation report
 ```
 
+## Setup (local development)
+
+1. Clone the repository
+   ```bash
+   git clone https://github.com/sageshwaran/smarthire-genai.git
+   cd smarthire-genai
+   ```
+
 2. Create and activate a virtual environment
-```bash
+   ```bash
    python -m venv venv
    venv\Scripts\activate        # Windows
    source venv/bin/activate     # macOS/Linux
-```
+   ```
 
 3. Install dependencies
-```bash
+   ```bash
    pip install -r requirements.txt
-```
+   ```
 
 4. Set up environment variables
-```bash
+   ```bash
    cp .env.example .env
-```
+   ```
    Add your Gemini API key to `.env`:
-   GOOGLE_API_KEY = your_key_here
+   ```
+   GOOGLE_API_KEY=your_key_here
+   ```
 
-
-5. Add a job dataset
-   Download a job postings dataset (e.g. [Naukri Data Science Jobs — Kaggle](https://www.kaggle.com/datasets/anandhuh/data-science-jobs-in-india))
-   and place the CSV at `data/jobs/naukri_data_science_jobs_india.csv`.
-
-6. Build the job search index
-```python
+5. (Optional — prebuilt indexes are already included in `vectorstore/`)
+   To rebuild the job search index from scratch with a different dataset:
+   ```python
    from src.search.job_search import build_job_index
-   build_job_index("data/jobs/naukri_data_science_jobs_india.csv", sample_size=1500)
-```
-   This embeds the job corpus and saves a FAISS index to `vectorstore/`. One-time
-   step; re-run only if the dataset changes.
-
-7. Build the career notes index
-```python
+   build_job_index("data/jobs/<your_dataset>.csv", sample_size=1500)
+   ```
+   And the career notes index:
+   ```python
    from src.mentor.rag_chain import build_career_notes_index
    build_career_notes_index()
-```
+   ```
 
-8. Run the app
-```bash
+6. Run the app
+   ```bash
    streamlit run app/streamlit_app.py
-```
+   ```
+
+## Deployment
+
+Deployed on [Streamlit Community Cloud](https://share.streamlit.io). The job
+corpus and career notes FAISS indexes are committed to the repository (rather
+than rebuilt on each deploy) to avoid cold-start delays and unnecessary embedding
+API usage. The Gemini API key is stored as a Streamlit Cloud secret, never
+committed to the repository. `src/config.py` reads the key from `.env` locally
+or from Streamlit secrets when deployed, automatically.
 
 ## Evaluation
 
@@ -130,6 +145,11 @@ covering:
   a more exhaustive detection system.
 - LLM output has observed run-to-run variance in grounding accuracy (documented in
   the evaluation report) — occasional inconsistencies are possible.
+- The deployed app uses a free-tier Gemini API key with daily usage quotas. Under
+  heavy use, features may become temporarily unavailable until the quota resets;
+  this is surfaced to the user as a plain message rather than an error page.
+- No rate limiting or abuse protection beyond Gemini's own API quotas — acceptable
+  for a portfolio deployment, but a noted gap for a production system.
 
 ## License
 
