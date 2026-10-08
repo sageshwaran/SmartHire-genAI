@@ -1,16 +1,18 @@
 import sys
+import html
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import streamlit as st
-import tempfile
 
 from src.parsing.loader import load_resume_text
 from src.parsing.resume_parser import parse_resume
 from src.search.job_search import match_jobs_for_profile
 from src.generate.cv_suggestions import generate_cv_suggestions
 from src.mentor.rag_chain import ask_mentor
+
 
 def friendly_error(e: Exception) -> str:
     """Translate common API failures into calm, non-technical messages for the UI."""
@@ -20,6 +22,12 @@ def friendly_error(e: Exception) -> str:
     if "rejected by guardrails" in msg:
         return msg.split("guardrails: ", 1)[-1] if "guardrails: " in msg else msg
     return "Something went wrong processing your request. Please try again."
+
+
+def esc(value) -> str:
+    """Escape dynamic text before placing it inside HTML rendered with unsafe_allow_html."""
+    return html.escape(str(value))
+
 
 st.set_page_config(page_title="SmartHire", layout="wide", initial_sidebar_state="expanded")
 
@@ -130,6 +138,7 @@ st.markdown("""
         margin: 0.8rem 0;
     }
 
+    /* Buttons in the main content area */
     .stButton button {
         background-color: var(--accent) !important;
         color: #ffffff !important;
@@ -140,12 +149,35 @@ st.markdown("""
         padding: 0.45rem 1.1rem;
         box-shadow: none !important;
     }
-    .stButton button p {
+    .stButton button p { color: #ffffff !important; }
+    .stButton button:hover { background-color: #3d6af0 !important; }
+
+    /* Sidebar navigation links (more specific, so they override the rules above) */
+    [data-testid="stSidebar"] .stButton button {
+        width: 100%;
+        text-align: left;
+        background: transparent !important;
+        color: #c5c8ce !important;
+        border: none !important;
+        border-radius: 4px;
+        font-weight: 500;
+        font-size: 0.87rem;
+        padding: 0.5rem 0.7rem;
+        margin-bottom: 2px;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] .stButton button p { color: inherit !important; }
+    [data-testid="stSidebar"] .stButton button:hover {
+        background: var(--surface-raised) !important;
         color: #ffffff !important;
     }
-    .stButton button:hover {
-        background-color: #3d6af0 !important;
+    [data-testid="stSidebar"] .stButton button[kind="primary"] {
+        background: var(--accent-dim) !important;
+        color: #ffffff !important;
+        border-left: 2px solid var(--accent) !important;
+        border-radius: 4px 0 0 4px;
     }
+    [data-testid="stSidebar"] .stButton button[kind="primary"] p { color: #ffffff !important; }
 
     [data-testid="stFileUploader"] section {
         background: var(--surface-raised);
@@ -160,46 +192,10 @@ st.markdown("""
         font-size: 0.88rem !important;
     }
 
-    [data-testid="stChatMessage"] {
-        background: var(--surface-raised);
-        border: 1px solid var(--border);
-        border-radius: 6px;
-    }
-
     hr { border-color: var(--border); }
-        /* Sidebar nav links */
-    [data-testid="stSidebar"] .stButton button {
-        width: 100%;
-        text-align: left;
-        background: transparent;
-        color: var(--text-secondary);
-        border: none;
-        border-radius: 4px;
-        font-weight: 500;
-        font-size: 0.87rem;
-        padding: 0.5rem 0.7rem;
-        margin-bottom: 2px;
-        box-shadow: none;
-        transition: background 0.1s ease;
-    }
-    [data-testid="stSidebar"] .stButton button:hover {
-        background: var(--surface-raised);
-        color: var(--text-primary);
-    }
-    [data-testid="stSidebar"] .stButton button:focus:not(:active) {
-        box-shadow: none;
-    }
-    /* Active nav item (primary button type) */
-    [data-testid="stSidebar"] .stButton button[kind="primary"] {
-        background: var(--accent-dim);
-        color: var(--text-primary);
-        border-left: 2px solid var(--accent);
-        border-radius: 4px 0 0 4px;
-    }
-    [data-testid="stSidebar"] .stButton button[kind="primary"]:hover {
-        background: var(--accent-dim);
-    }
-        .chat-row {
+
+    /* Chat bubbles */
+    .chat-row {
         display: flex;
         margin-bottom: 10px;
     }
@@ -225,20 +221,26 @@ st.markdown("""
         border: 1px solid var(--border);
         border-bottom-left-radius: 2px;
     }
-    /* Hide Streamlit GitHub/source icon */
-        [data-testid="stToolbar"] {
-            display: none !important;
-        }
 
-        /* Hide the top-right menu if needed */
-        #MainMenu {
-            visibility: hidden;
-        }
+    /* Hide toolbar actions (menu, deploy, status, GitHub link) but keep the
+       toolbar itself, which holds the sidebar expand button on mobile */
+    [data-testid="stToolbarActions"],
+    [data-testid="stMainMenu"],
+    [data-testid="stAppDeployButton"],
+    [data-testid="stStatusWidget"],
+    #MainMenu {
+        display: none !important;
+    }
 
-        /* Hide Streamlit footer */
-        footer {
-            visibility: hidden;
-        }
+    /* Safety net: the sidebar expand control must always stay visible */
+    [data-testid="stExpandSidebarButton"],
+    [data-testid="stSidebarCollapsedControl"],
+    [data-testid="collapsedControl"] {
+        display: flex !important;
+        visibility: visible !important;
+    }
+
+    footer { visibility: hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -251,14 +253,12 @@ if "matched_jobs" not in st.session_state:
     st.session_state.matched_jobs = None
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "page" not in st.session_state:
+    st.session_state.page = "Resume"
 
 # ----------------------------------------------------------------------------
 # Sidebar navigation
 # ----------------------------------------------------------------------------
-with st.sidebar:
-   if "page" not in st.session_state:
-    st.session_state.page = "Resume"
-
 NAV_ITEMS = ["Resume", "Matched roles", "CV review", "Career mentor"]
 
 with st.sidebar:
@@ -275,7 +275,7 @@ with st.sidebar:
     st.divider()
     if st.session_state.profile:
         st.markdown('<div class="field-label">Loaded resume</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="field-value">{st.session_state.profile.name}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="field-value">{esc(st.session_state.profile.name)}</div>', unsafe_allow_html=True)
     else:
         st.markdown('<div class="status-line">No resume loaded</div>', unsafe_allow_html=True)
 
@@ -306,7 +306,7 @@ if page == "Resume":
                     st.session_state.profile = parse_resume(resume_text)
                     st.session_state.matched_jobs = None
                 except Exception as e:
-                    st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="status-line">{esc(friendly_error(e))}</div>', unsafe_allow_html=True)
                 finally:
                     Path(tmp_path).unlink(missing_ok=True)
 
@@ -317,30 +317,30 @@ if page == "Resume":
         c1, c2, c3 = st.columns(3)
         with c1:
             st.markdown('<div class="field-label">Name</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="field-value">{p.name}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="field-value">{esc(p.name)}</div>', unsafe_allow_html=True)
         with c2:
             st.markdown('<div class="field-label">Contact</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="field-value">{p.email or "—"}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="field-value">{esc(p.email or "—")}</div>', unsafe_allow_html=True)
         with c3:
             st.markdown('<div class="field-label">Target role</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="field-value">{p.target_role or "—"}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="field-value">{esc(p.target_role or "—")}</div>', unsafe_allow_html=True)
 
         st.markdown('<div class="field-label">Skills</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="field-value">{", ".join(p.skills) if p.skills else "None extracted"}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="field-value">{esc(", ".join(p.skills)) if p.skills else "None extracted"}</div>', unsafe_allow_html=True)
 
         if p.education:
             st.markdown('<div class="field-label">Education</div>', unsafe_allow_html=True)
             for edu in p.education:
-                st.markdown(f'<div class="field-value">{edu.degree} — {edu.institution} ({edu.year or "n/a"})</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="field-value">{esc(edu.degree)} — {esc(edu.institution)} ({esc(edu.year or "n/a")})</div>', unsafe_allow_html=True)
 
         if p.experience:
             st.markdown('<div class="field-label">Experience</div>', unsafe_allow_html=True)
             for exp in p.experience:
-                st.markdown(f'<div class="field-value">{exp.title}, {exp.company} ({exp.duration})</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="field-value">{esc(exp.title)}, {esc(exp.company)} ({esc(exp.duration)})</div>', unsafe_allow_html=True)
 
         if p.summary:
             st.markdown('<div class="field-label">Summary</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="field-value">{p.summary}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="field-value">{esc(p.summary)}</div>', unsafe_allow_html=True)
 
 # ----------------------------------------------------------------------------
 # Page: Matched roles
@@ -361,16 +361,16 @@ elif page == "Matched roles":
                 with st.spinner("Searching"):
                     st.session_state.matched_jobs = match_jobs_for_profile(st.session_state.profile, top_n=top_n)
             except Exception as e:
-                st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="status-line">{esc(friendly_error(e))}</div>', unsafe_allow_html=True)
 
         if st.session_state.matched_jobs:
             st.divider()
             for job in st.session_state.matched_jobs:
                 st.markdown(f"""
                 <div class="record-card">
-                    <div class="record-title">{job['job_role']}</div>
-                    <div class="record-meta">{job['company']} · {job['location']} · {job['experience']}</div>
-                    <div class="record-body">{job['skills_description'][:200]}</div>
+                    <div class="record-title">{esc(job['job_role'])}</div>
+                    <div class="record-meta">{esc(job['company'])} · {esc(job['location'])} · {esc(job['experience'])}</div>
+                    <div class="record-body">{esc(str(job['skills_description'])[:200])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -400,26 +400,27 @@ elif page == "CV review":
                     with st.spinner("Reviewing"):
                         suggestions = generate_cv_suggestions(st.session_state.profile, target_job_text)
                 except Exception as e:
-                    st.markdown(f'<div class="status-line">{friendly_error(e)}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="status-line">{esc(friendly_error(e))}</div>', unsafe_allow_html=True)
+
                 if suggestions:
                     st.divider()
 
-                if suggestions.missing_skills:
-                    st.markdown('<div class="field-label">Missing skills</div>', unsafe_allow_html=True)
-                    st.markdown(f'<div class="field-value">{", ".join(suggestions.missing_skills)}</div>', unsafe_allow_html=True)
+                    if suggestions.missing_skills:
+                        st.markdown('<div class="field-label">Missing skills</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="field-value">{esc(", ".join(suggestions.missing_skills))}</div>', unsafe_allow_html=True)
 
-                if suggestions.weak_bullet_points:
-                    st.markdown('<div class="field-label">Weak points</div>', unsafe_allow_html=True)
-                    for wbp in suggestions.weak_bullet_points:
-                        st.markdown(f"""
-                        <div class="record-card">
-                            <div class="record-title">{wbp.original_line}</div>
-                            <div class="record-body"><b>Issue:</b> {wbp.issue}<br><b>Rewrite:</b> {wbp.suggested_rewrite}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
+                    if suggestions.weak_bullet_points:
+                        st.markdown('<div class="field-label">Weak points</div>', unsafe_allow_html=True)
+                        for wbp in suggestions.weak_bullet_points:
+                            st.markdown(f"""
+                            <div class="record-card">
+                                <div class="record-title">{esc(wbp.original_line)}</div>
+                                <div class="record-body"><b>Issue:</b> {esc(wbp.issue)}<br><b>Rewrite:</b> {esc(wbp.suggested_rewrite)}</div>
+                            </div>
+                            """, unsafe_allow_html=True)
 
-                st.markdown('<div class="field-label">Suggested summary</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="field-value">{suggestions.rewritten_summary}</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="field-label">Suggested summary</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="field-value">{esc(suggestions.rewritten_summary)}</div>', unsafe_allow_html=True)
 
 # ----------------------------------------------------------------------------
 # Page: Career mentor
@@ -429,9 +430,10 @@ elif page == "Career mentor":
     st.markdown('<div class="app-subtitle">Unsupported or off-topic questions are declined.</div>', unsafe_allow_html=True)
 
     for role, message in st.session_state.chat_history:
+        safe_message = esc(message).replace("\n", "<br>")
         st.markdown(f"""
         <div class="chat-row {role}">
-            <div class="chat-bubble {role}">{message}</div>
+            <div class="chat-bubble {role}">{safe_message}</div>
         </div>
         """, unsafe_allow_html=True)
 
