@@ -46,29 +46,31 @@ evaluation, and deployment.
 ```
 smarthire-genai/
 ├── .streamlit/
-│   └── config.toml        # Theme and file watcher settings
+│   └── config.toml          # Theme and file watcher settings
 ├── data/
-│   ├── jobs/               # Job postings dataset (CSV, not committed)
-│   ├── resumes/              # Sample resumes for testing
-│   └── career_notes/           # Career guidance documents the mentor retrieves from
-├── vectorstore/                  # Prebuilt FAISS indexes (committed for deployment)
+│   ├── jobs/                  # Job postings dataset (CSV, not committed)
+│   ├── resumes/               # Sample resumes for testing
+│   └── career_notes/          # Career guidance documents the mentor retrieves from
+├── vectorstore/               # Prebuilt FAISS indexes (committed for deployment)
 ├── src/
-│   ├── config.py                  # Settings; reads secrets from .env locally or
-│   │                                 Streamlit secrets when deployed
-│   ├── parsing/                     # Resume loading + structured parsing
-│   ├── search/                        # Embeddings + FAISS job search
-│   ├── generate/                        # Prompt library + CV suggestion generator
-│   ├── mentor/                            # RAG career mentor (LangChain)
-│   ├── safety/                              # Guardrails layer
-│   └── evaluate.py                            # Evaluation script
+│   ├── config.py              # Settings; reads secrets from .env locally or
+│   │                          # Streamlit secrets when deployed
+│   ├── parsing/               # Resume loading + structured parsing
+│   ├── search/                # Embeddings + FAISS job search
+│   ├── generate/              # Prompt library + CV suggestion generator
+│   ├── mentor/                # RAG career mentor (LangChain)
+│   ├── safety/                # Guardrails layer
+│   └── evaluate.py            # Evaluation script
 ├── app/
-│   └── streamlit_app.py                         # Streamlit portal
-├── runtime.txt                                    # Pinned Python version for deployment
+│   └── app.py                 # Streamlit portal
 └── reports/
-    └── answer_quality.md                            # Evaluation report
+    ├── answer_quality.md      # Evaluation results
+    └── final_report.md        # Design choices, what worked, limitations
 ```
 
 ## Setup (local development)
+
+Requires Python 3.11 (the version used for development and testing).
 
 1. Clone the repository
    ```bash
@@ -89,10 +91,9 @@ smarthire-genai/
    ```
 
 4. Set up environment variables
-   ```bash
-   cp .env.example .env
-   ```
-   Add your Gemini API key to `.env`:
+
+   Copy `.env.example` to `.env` (`copy .env.example .env` on Windows,
+   `cp .env.example .env` on macOS/Linux) and add your Gemini API key:
    ```
    GOOGLE_API_KEY=your_key_here
    ```
@@ -111,28 +112,30 @@ smarthire-genai/
 
 6. Run the app
    ```bash
-   streamlit run app/streamlit_app.py
+   streamlit run app/app.py
    ```
 
 ## Deployment
 
-Deployed on [Streamlit Community Cloud](https://share.streamlit.io). The job
-corpus and career notes FAISS indexes are committed to the repository (rather
-than rebuilt on each deploy) to avoid cold-start delays and unnecessary embedding
-API usage. The Gemini API key is stored as a Streamlit Cloud secret, never
-committed to the repository. `src/config.py` reads the key from `.env` locally
-or from Streamlit secrets when deployed, automatically.
+Deployed on [Streamlit Community Cloud](https://share.streamlit.io) with
+`app/app.py` as the entrypoint. The job corpus and career notes FAISS indexes
+are committed to the repository (rather than rebuilt on each deploy) to avoid
+cold-start delays and unnecessary embedding API usage. The Gemini API key is
+stored as a Streamlit Cloud secret, never committed to the repository.
+`src/config.py` reads the key from `.env` locally or from Streamlit secrets
+when deployed, automatically.
 
-## Evaluation
+## Evaluation and Reports
 
-See [`reports/answer_quality.md`](reports/answer_quality.md) for the full evaluation,
-covering:
-- **Retrieval relevance** — manual relevance scoring across test queries (96% hit rate)
-- **Answer quality** — correctness, grounding, and helpfulness scoring for mentor responses
-- **Prompt comparison** — a documented before/after comparing an unstructured baseline
-  prompt against a grounded, schema-enforced prompt
-- **Hallucination check** — confirms the mentor declines or admits uncertainty rather
-  than fabricating answers (4/4 correct refusals in testing)
+- [`reports/answer_quality.md`](reports/answer_quality.md) — evaluation results:
+  - **Retrieval relevance** — manual relevance scoring across test queries (96% hit rate)
+  - **Answer quality** — correctness, grounding, and helpfulness scoring for mentor responses
+  - **Prompt comparison** — a documented before/after comparing an unstructured baseline
+    prompt against a grounded, schema-enforced prompt
+  - **Hallucination check** — confirms the mentor declines or admits uncertainty rather
+    than fabricating answers (4/4 correct refusals in testing)
+- [`reports/final_report.md`](reports/final_report.md) — design choices, what worked,
+  limitations, and possible future work.
 
 ## Known Limitations
 
